@@ -56,7 +56,7 @@ export function createEngine(context: Context, options: Options): Engine {
 
     try {
       debug("fetch start", { providerID })
-      const snapshot = await adapter.fetch(context, request.signal, options)
+      const snapshot = await adapter.fetch(context, request.signal, options, providerID)
       if (request.signal.aborted || disposed) return
       debug("fetch ok", { providerID, kind: snapshot.kind })
       patch(providerID, { snapshot, at: Date.now(), error: undefined, loading: false, retryAt: undefined })

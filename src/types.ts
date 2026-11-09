@@ -59,5 +59,5 @@ export type Options = {
 export type Adapter = {
   readonly id: string
   readonly label: string
-  readonly fetch: (ctx: Context, signal: AbortSignal, options: Options) => Promise<Snapshot>
+  readonly fetch: (ctx: Context, signal: AbortSignal, options: Options, providerID: string) => Promise<Snapshot>
 }

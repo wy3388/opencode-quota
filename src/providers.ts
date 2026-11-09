@@ -32,8 +32,8 @@ export const goAdapter: Adapter = {
 export const ollamaAdapter: Adapter = {
   id: "ollama",
   label: "Ollama",
-  async fetch(_ctx, signal, options: Options): Promise<Snapshot> {
-    const key = await resolveOllamaKey(options)
+  async fetch(ctx, signal, options: Options, providerID: string): Promise<Snapshot> {
+    const key = await resolveOllamaKey(ctx, providerID, options)
     if (!key) return { kind: "notice", text: "未配置 key" }
 
     const base = (options.ollamaBaseURL ?? "https://ollama.com").replace(/\/+$/, "")

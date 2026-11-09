@@ -41,12 +41,34 @@ function dataDirectory() {
   if (xdg) return join(xdg, "opencode");
   return join(process.env.HOME?.trim() || homedir(), ".local", "share", "opencode");
 }
-async function resolveOllamaKey(options) {
-  const fromEnv = process.env.OLLAMA_API_KEY?.trim();
-  if (fromEnv) return fromEnv;
+async function resolveOllamaKey(context, providerID, options) {
   const fromOptions = typeof options.ollamaKey === "string" ? options.ollamaKey.trim() : "";
   if (fromOptions) return fromOptions;
-  return readStoredKey("ollama");
+  const fromEnv = process.env.OLLAMA_API_KEY?.trim();
+  if (fromEnv) return fromEnv;
+  const fromIntegration = await readIntegrationKey(context, providerID);
+  if (fromIntegration) return fromIntegration;
+  return readStoredKey(providerID);
+}
+async function readIntegrationKey(context, providerID) {
+  try {
+    const providers = context.data.location.provider.list(context.location) ?? [];
+    const provider = providers.find((entry) => entry.id === providerID);
+    const integrationID = provider?.integrationID ?? providerID;
+    const credentials = await context.client.credential.list();
+    const candidates = credentials.filter(
+      (entry) => entry.active !== false && (entry.integrationID === integrationID || entry.integrationID === providerID)
+    );
+    for (const entry of candidates) {
+      const value = entry.value;
+      const secret = value.type === "key" ? value.key : value.type === "oauth" ? value.access : void 0;
+      const trimmed = secret?.trim();
+      if (trimmed) return trimmed;
+    }
+    return void 0;
+  } catch {
+    return void 0;
+  }
 }
 async function readStoredKey(providerID) {
   try {
@@ -87,8 +109,8 @@ var goAdapter = {
 var ollamaAdapter = {
   id: "ollama",
   label: "Ollama",
-  async fetch(_ctx, signal, options) {
-    const key = await resolveOllamaKey(options);
+  async fetch(ctx, signal, options, providerID) {
+    const key = await resolveOllamaKey(ctx, providerID, options);
     if (!key) return { kind: "notice", text: "\u672A\u914D\u7F6E key" };
     const base = (options.ollamaBaseURL ?? "https://ollama.com").replace(/\/+$/, "");
     const response = await fetch(`${base}/api/balance`, {
@@ -176,7 +198,7 @@ function createEngine(context, options) {
     patch(providerID, { loading: true });
     try {
       debug("fetch start", { providerID });
-      const snapshot = await adapter.fetch(context, request.signal, options);
+      const snapshot = await adapter.fetch(context, request.signal, options, providerID);
       if (request.signal.aborted || disposed) return;
       debug("fetch ok", { providerID, kind: snapshot.kind });
       patch(providerID, { snapshot, at: Date.now(), error: void 0, loading: false, retryAt: void 0 });

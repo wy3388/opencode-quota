@@ -7,7 +7,7 @@ OpenCode TUI 插件：在侧边栏显示**当前模型所属提供商**的剩余
 | 当前模型 providerID | 显示 |
 | --- | --- |
 | `opencode-go` | `Go 5h 24% · 7d 9% · 1M 18%`（滚动 5 小时 / 周 / 月已用比例） |
-| `ollama` | `Ollama $72.50 / $100`（Ollama Cloud 余额 / 额度） |
+| `ollama`、`ollama-cloud` | `Ollama $58.04 / $60`（Ollama Cloud 余额 / 额度） |
 | 其它（`xai`、`happycoding`…） | 不渲染任何内容 |
 
 ## 安装
@@ -51,7 +51,7 @@ npm run typecheck
     "pollSeconds": 60,       // 刷新间隔，最小 15 秒
     "go": true,              // 启用 OpenCode Go 数据源
     "ollama": true,          // 启用 Ollama Cloud 数据源
-    "ollamaKey": "",         // 可选；不填则读 OLLAMA_API_KEY / auth.json
+    "ollamaKey": "",         // 可选；不填则自动读集成凭据 / OLLAMA_API_KEY / auth.json
     "ollamaBaseURL": "https://ollama.com",
     "homeFooter": false      // 同时在首页 footer 显示
   }
@@ -63,7 +63,8 @@ npm run typecheck
 - **OpenCode Go**：调用本机 server 的 `client.experimental.usage.limits()`，
   复用已登录的 Console 账号，插件不接触任何 token。未登录时显示「未登录 Console」。
 - **Ollama Cloud**：`GET https://ollama.com/api/balance`，Bearer token 依次取自
-  `OLLAMA_API_KEY` → 插件 `ollamaKey` → `~/.local/share/opencode/auth.json` 的 `ollama.key`。
+  插件 `ollamaKey` → `OLLAMA_API_KEY` → **集成凭据**（`client.credential.list()`，
+  按 provider 的 `integrationID` 匹配，例如 `ollama-cloud`）→ `~/.local/share/opencode/auth.json`。
   兼容新套餐（美元额度）和旧套餐（`session` / `weekly` 百分比）两种响应。
   key 不会出现在日志、toast 或异常信息中。
 
