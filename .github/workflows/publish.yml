@@ -34,6 +34,9 @@ jobs:
             exit 1
           fi
 
+      # Trusted publishing needs npm >= 11.5.1; do not rely on the bundled one.
+      - run: npm i -g npm@latest
+
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run build
