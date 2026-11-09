@@ -42,4 +42,10 @@ jobs:
       - run: npm run build
 
       - name: Publish to npm
-        run: npm publish
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if npm view "@wy3366/opencode-quota@${version}" version >/dev/null 2>&1; then
+            echo "::notice::@wy3366/opencode-quota@${version} is already published, skipping"
+            exit 0
+          fi
+          npm publish
