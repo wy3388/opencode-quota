@@ -12,13 +12,13 @@ OpenCode TUI 插件：在侧边栏显示**当前模型所属提供商**的剩余
 
 ## 安装
 
-已发布到私有 npm 仓库（`packages.aliyun.com`），安装需要本机 `~/.npmrc` 里配好该仓库和 token。
+已发布到 npm 公开仓库：<https://www.npmjs.com/package/@wy3366/opencode-quota>
 
 ```json title="~/.config/opencode/cli.json"
 {
   "plugins": [
     { "package": "opencode-cache-and-tps@latest", "options": { "enabled": true } },
-    "opencode-quota@0.1.0"
+    "@wy3366/opencode-quota@0.1.0"
   ]
 }
 ```
@@ -26,7 +26,7 @@ OpenCode TUI 插件：在侧边栏显示**当前模型所属提供商**的剩余
 也可以让 OpenCode 自己装：
 
 ```bash
-opencode plugin add opencode-quota@0.1.0
+opencode plugin add @wy3366/opencode-quota@0.1.0
 opencode plugin list
 ```
 
@@ -40,7 +40,7 @@ opencode plugin list
 
 ### 本地开发模式
 
-调试源码时把 `cli.json` 里的 `opencode-quota@0.1.0` 换成本地目录绝对路径
+调试源码时把 `cli.json` 里的 `@wy3366/opencode-quota@0.1.0` 换成本地目录绝对路径
 （例如 `/Users/wangyin/IdeaProjects/opencode-quota`）。两者不要同时配置，否则侧边栏会出现两行。
 
 ## 构建与发布
@@ -51,16 +51,16 @@ npm run build     # src/tui.tsx -> dist/tui.js（Solid 编译器，必须）
 npm run dev       # 监听模式，改完在 TUI 里 /reload
 npm run typecheck
 
-npm version patch && npm publish   # 发布到 ~/.npmrc 里的默认 registry
+npm version patch && npm publish   # 发布到 npmjs（publishConfig.access = public）
 ```
 
 > 必须用 `build.tui.mjs`（esbuild + esbuild-plugin-solid）打包，不能用 Bun 内置 JSX 转换：
 > Bun 的 JSX 是 React 式的一次性求值，Solid 的细粒度更新会失效（表现为首次渲染正常、数据更新后界面不动）。
 > `prepublishOnly` 已挂 `npm run build`，发布前会自动重新构建。
 
-## 发布流程（GitHub + 私有 npm）
+## 发布流程（GitHub + npm 公开仓库）
 
-源码放 GitHub，产物发私有 npm；打 tag 自动发布。
+源码放 GitHub，产物发 npm 公开仓库；打 tag 自动发布。
 
 1. **首次推送**
 
@@ -69,10 +69,11 @@ npm version patch && npm publish   # 发布到 ~/.npmrc 里的默认 registry
    gh repo create opencode-quota --private --source=. --remote=origin --push
    ```
 
-2. **配置仓库 secret**（值取自本机 `~/.npmrc` 的 `_authToken`）
+2. **配置仓库 secret**：在 npmjs 生成 Granular Access Token（Packages: read and write，
+   并授权 `@wy3366/opencode-quota`），然后
 
    ```bash
-   grep _authToken ~/.npmrc | cut -d= -f2- | gh secret set NPM_TOKEN
+   gh secret set NPM_TOKEN     # 粘贴 token，不要写进仓库
    ```
 
 3. **发版**
@@ -82,7 +83,7 @@ npm version patch && npm publish   # 发布到 ~/.npmrc 里的默认 registry
    ```
 
    推送 `v*` tag 后，`.github/workflows/publish.yml` 会执行
-   `npm ci → typecheck → npm publish`（`prepublishOnly` 会重新构建 `dist/tui.js`）。
+   `npm ci → typecheck → build → npm publish`（`publishConfig.access: public`）。
 
 4. **只走 GitHub、不发 npm**
 
