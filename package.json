@@ -62,5 +62,13 @@
   ],
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wy3388/opencode-quota.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wy3388/opencode-quota/issues"
+  },
+  "homepage": "https://github.com/wy3388/opencode-quota#readme"
 }
