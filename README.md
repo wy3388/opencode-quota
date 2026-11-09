@@ -58,6 +58,41 @@ npm version patch && npm publish   # 发布到 ~/.npmrc 里的默认 registry
 > Bun 的 JSX 是 React 式的一次性求值，Solid 的细粒度更新会失效（表现为首次渲染正常、数据更新后界面不动）。
 > `prepublishOnly` 已挂 `npm run build`，发布前会自动重新构建。
 
+## 发布流程（GitHub + 私有 npm）
+
+源码放 GitHub，产物发私有 npm；打 tag 自动发布。
+
+1. **首次推送**
+
+   ```bash
+   gh auth login                                  # 或把 ~/.ssh/id_rsa.pub 加到 GitHub
+   gh repo create opencode-quota --private --source=. --remote=origin --push
+   ```
+
+2. **配置仓库 secret**（值取自本机 `~/.npmrc` 的 `_authToken`）
+
+   ```bash
+   grep _authToken ~/.npmrc | cut -d= -f2- | gh secret set NPM_TOKEN
+   ```
+
+3. **发版**
+
+   ```bash
+   npm version patch && git push --follow-tags    # 等价于 npm run release:patch
+   ```
+
+   推送 `v*` tag 后，`.github/workflows/publish.yml` 会执行
+   `npm ci → typecheck → npm publish`（`prepublishOnly` 会重新构建 `dist/tui.js`）。
+
+4. **只走 GitHub、不发 npm**
+
+   仓库里已提交 `dist/tui.js`，可以直接用 git 安装，无需构建：
+
+   ```bash
+   opencode plugin add github:<you>/opencode-quota
+   opencode plugin add 'github:<you>/opencode-quota#v0.1.0'
+   ```
+
 ## 配置项
 
 ```jsonc
