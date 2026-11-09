@@ -1,19 +1,21 @@
 {
   "name": "opencode-quota",
   "version": "0.1.0",
-  "private": true,
   "description": "OpenCode TUI plugin that shows the active model provider's remaining quota in the sidebar",
   "type": "module",
   "exports": {
     "./tui": "./dist/tui.js"
   },
   "files": [
-    "src"
+    "dist",
+    "src",
+    "README.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "node build.tui.mjs",
-    "dev": "node build.tui.mjs --watch"
+    "dev": "node build.tui.mjs --watch",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@opencode/plugin": "^2.2.6",
@@ -46,5 +48,15 @@
     "solid-js": {
       "optional": true
     }
-  }
+  },
+  "license": "MIT",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "tui",
+    "quota",
+    "balance",
+    "ollama",
+    "opencode-go"
+  ]
 }
