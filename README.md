@@ -12,35 +12,51 @@ OpenCode TUI 插件：在侧边栏显示**当前模型所属提供商**的剩余
 
 ## 安装
 
-插件按包加载，入口是构建产物 `dist/tui.js`（必须构建后才能被 OpenCode 读取）。
+已发布到私有 npm 仓库（`packages.aliyun.com`），安装需要本机 `~/.npmrc` 里配好该仓库和 token。
 
 ```json title="~/.config/opencode/cli.json"
 {
   "plugins": [
     { "package": "opencode-cache-and-tps@latest", "options": { "enabled": true } },
-    "/Users/wangyin/IdeaProjects/opencode-quota"
+    "opencode-quota@0.1.0"
   ]
 }
+```
+
+也可以让 OpenCode 自己装：
+
+```bash
+opencode plugin add opencode-quota@0.1.0
+opencode plugin list
 ```
 
 - 条目顺序决定侧边栏位置：`sidebar.content` 只有 `prepend`（最前）和 `append`（最后），
   同为 `prepend` 时按这里的顺序排列。放在 `opencode-cache-and-tps` 之后，
   额度行就出现在缓存面板之下、内置 Context 之上。
-- 修改 `cli.json` 后需要重启 TUI（`cli.json` 只在启动时读取）；修改插件代码后按 `/reload`。
+- 这是纯 TUI 插件，配置在 `cli.json`（而不是 `opencode.json`），连接远程 server 时依然生效。
+- 修改 `cli.json` 后需要重启 TUI（`cli.json` 只在启动时读取）；升级包后同样重启或 `opencode service restart`。
 - 注意：`cli.json` 里任何一个非法字段都会导致整个文件被忽略、插件全部失效
   （例如 `session.sidebar` 只接受 `"auto"` 或 `"hide"`）。
 
-## 构建
+### 本地开发模式
+
+调试源码时把 `cli.json` 里的 `opencode-quota@0.1.0` 换成本地目录绝对路径
+（例如 `/Users/wangyin/IdeaProjects/opencode-quota`）。两者不要同时配置，否则侧边栏会出现两行。
+
+## 构建与发布
 
 ```bash
 npm install
 npm run build     # src/tui.tsx -> dist/tui.js（Solid 编译器，必须）
 npm run dev       # 监听模式，改完在 TUI 里 /reload
 npm run typecheck
+
+npm version patch && npm publish   # 发布到 ~/.npmrc 里的默认 registry
 ```
 
 > 必须用 `build.tui.mjs`（esbuild + esbuild-plugin-solid）打包，不能用 Bun 内置 JSX 转换：
 > Bun 的 JSX 是 React 式的一次性求值，Solid 的细粒度更新会失效（表现为首次渲染正常、数据更新后界面不动）。
+> `prepublishOnly` 已挂 `npm run build`，发布前会自动重新构建。
 
 ## 配置项
 
