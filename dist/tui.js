@@ -41,10 +41,10 @@ function dataDirectory() {
   if (xdg) return join(xdg, "opencode");
   return join(process.env.HOME?.trim() || homedir(), ".local", "share", "opencode");
 }
-async function resolveOllamaKey(context, providerID, options) {
-  const fromOptions = typeof options.ollamaKey === "string" ? options.ollamaKey.trim() : "";
+async function resolveProviderKey(context, providerID, overrides = {}) {
+  const fromOptions = typeof overrides.option === "string" ? overrides.option.trim() : "";
   if (fromOptions) return fromOptions;
-  const fromEnv = process.env.OLLAMA_API_KEY?.trim();
+  const fromEnv = overrides.env ? process.env[overrides.env]?.trim() : void 0;
   if (fromEnv) return fromEnv;
   const fromIntegration = await readIntegrationKey(context, providerID);
   if (fromIntegration) return fromIntegration;
@@ -87,6 +87,17 @@ async function readStoredKey(providerID) {
 
 // src/providers.ts
 var number = (value) => typeof value === "number" && Number.isFinite(value) ? value : void 0;
+var decimal = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return void 0;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : void 0;
+};
+var retryAfter = (response) => {
+  const header = Number(response.headers.get("retry-after") ?? "");
+  const seconds = Number.isFinite(header) && header > 0 ? header : 60;
+  throw new QuotaError("\u9650\u6D41", seconds * 1e3);
+};
 var goAdapter = {
   id: "opencode-go",
   label: "Go",
@@ -110,7 +121,7 @@ var ollamaAdapter = {
   id: "ollama",
   label: "Ollama",
   async fetch(ctx, signal, options, providerID) {
-    const key = await resolveOllamaKey(ctx, providerID, options);
+    const key = await resolveProviderKey(ctx, providerID, { option: options.ollamaKey, env: "OLLAMA_API_KEY" });
     if (!key) return { kind: "notice", text: "\u672A\u914D\u7F6E key" };
     const base = (options.ollamaBaseURL ?? "https://ollama.com").replace(/\/+$/, "");
     const response = await fetch(`${base}/api/balance`, {
@@ -118,11 +129,7 @@ var ollamaAdapter = {
       signal
     });
     if (response.status === 401 || response.status === 403) return { kind: "notice", text: "key \u65E0\u6548" };
-    if (response.status === 429) {
-      const retryAfter = Number(response.headers.get("retry-after") ?? "");
-      const seconds = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 60;
-      throw new QuotaError("\u9650\u6D41", seconds * 1e3);
-    }
+    if (response.status === 429) retryAfter(response);
     if (!response.ok) throw new QuotaError(String(response.status));
     const body = await response.json();
     const included = body?.included ?? {};
@@ -142,13 +149,47 @@ var ollamaAdapter = {
     return snapshot;
   }
 };
-var adapters = [goAdapter, ollamaAdapter];
+var deepseekAdapter = {
+  id: "deepseek",
+  label: "DeepSeek",
+  async fetch(ctx, signal, options, providerID) {
+    const key = await resolveProviderKey(ctx, providerID, { option: options.deepseekKey, env: "DEEPSEEK_API_KEY" });
+    if (!key) return { kind: "notice", text: "\u672A\u914D\u7F6E key" };
+    const base = (options.deepseekBaseURL ?? "https://api.deepseek.com").replace(/\/+$/, "");
+    const response = await fetch(`${base}/user/balance`, {
+      headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
+      signal
+    });
+    if (response.status === 401 || response.status === 403) return { kind: "notice", text: "key \u65E0\u6548" };
+    if (response.status === 429) retryAfter(response);
+    if (!response.ok) throw new QuotaError(String(response.status));
+    const body = await response.json();
+    const infos = Array.isArray(body?.balance_infos) ? body.balance_infos : [];
+    const balances = infos.flatMap((info) => {
+      const currency = typeof info?.currency === "string" ? info.currency : void 0;
+      const total = decimal(info?.total_balance);
+      if (!currency || total === void 0) return [];
+      return [
+        {
+          currency,
+          total,
+          granted: decimal(info?.granted_balance),
+          toppedUp: decimal(info?.topped_up_balance)
+        }
+      ];
+    });
+    if (balances.length === 0) return { kind: "notice", text: "\u65E0\u4F59\u989D\u6570\u636E" };
+    return { kind: "deepseek", available: body?.is_available !== false, balances };
+  }
+};
+var adapters = [goAdapter, ollamaAdapter, deepseekAdapter];
 function adapterFor(providerID, options) {
   if (!providerID) return void 0;
   const id = providerID.toLowerCase();
   return adapters.find((adapter) => {
     if (adapter.id === "opencode-go") return options.go !== false && id === adapter.id;
     if (adapter.id === "ollama") return options.ollama !== false && (id === adapter.id || id.startsWith("ollama-"));
+    if (adapter.id === "deepseek") return options.deepseek !== false && (id === adapter.id || id.startsWith("deepseek-"));
     return false;
   });
 }
@@ -250,6 +291,18 @@ function money(value) {
     maximumFractionDigits: 2
   }).format(value);
 }
+function moneyIn(currency, value) {
+  try {
+    return new Intl.NumberFormat(currency === "CNY" ? "zh-CN" : "en-US", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currency}`;
+  }
+}
 function resetTime(value) {
   if (!value || !Number.isFinite(value)) return void 0;
   const date = new Date(value);
@@ -309,9 +362,26 @@ function ollamaView(snapshot) {
     tone
   };
 }
+function deepseekView(snapshot) {
+  const primary = snapshot.balances[0];
+  if (!primary) {
+    return {
+      label: "DeepSeek",
+      text: snapshot.available ? "\u2014" : "\u4F59\u989D\u4E0D\u8DB3",
+      tone: snapshot.available ? "muted" : "error"
+    };
+  }
+  const tone = !snapshot.available || primary.total < 10 ? "error" : primary.total < 30 ? "warning" : "muted";
+  return {
+    label: "DeepSeek",
+    text: moneyIn(primary.currency, primary.total),
+    tone
+  };
+}
 function viewFor(snapshot) {
   if (snapshot.kind === "go") return goView(snapshot);
   if (snapshot.kind === "ollama") return ollamaView(snapshot);
+  if (snapshot.kind === "deepseek") return deepseekView(snapshot);
   return {
     label: "",
     text: snapshot.text,
@@ -421,6 +491,14 @@ function details(context, engine, options, sessionID) {
     if (snapshot.weekly !== void 0) lines.push(`\u672C\u5468\u5269\u4F59: ${percent(snapshot.weekly)}`);
     const reset = resetTime(snapshot.resetAt);
     if (reset) lines.push(`\u5468\u671F\u91CD\u7F6E: ${reset}`);
+  } else if (snapshot.kind === "deepseek") {
+    lines.push(`\u53EF\u7528\u72B6\u6001: ${snapshot.available ? "\u6B63\u5E38" : "\u4F59\u989D\u4E0D\u8DB3"}`);
+    for (const balance of snapshot.balances) {
+      const parts = [`\u603B\u989D ${moneyIn(balance.currency, balance.total)}`];
+      if (balance.granted !== void 0) parts.push(`\u8D60\u9001 ${moneyIn(balance.currency, balance.granted)}`);
+      if (balance.toppedUp !== void 0) parts.push(`\u5145\u503C ${moneyIn(balance.currency, balance.toppedUp)}`);
+      lines.push(`${balance.currency}: ${parts.join(" \xB7 ")}`);
+    }
   } else {
     lines.push(snapshot.text);
   }

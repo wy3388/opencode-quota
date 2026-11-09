@@ -10,9 +10,10 @@
 | --- | --- | --- |
 | `opencode-go` | `Go 5h 24% · 7d 9% · 1M 18%` | 滚动 5 小时 / 本周 / 本月已用比例 |
 | `ollama`、`ollama-cloud` | `Ollama $58.04 / $60` | Ollama Cloud 剩余额度 / 总额度 |
+| `deepseek` | `DeepSeek ¥110.00` | DeepSeek 官方 API 预付余额 |
 | 其它（`xai`、`openrouter`…） | 不渲染 | — |
 
-颜色随剩余量变化：Go 已用 ≥ 75% 变黄、≥ 90% 变红；Ollama 余额 < 25% 变黄、< 10% 变红。
+颜色随剩余量变化：Go 已用 ≥ 75% 变黄、≥ 90% 变红；Ollama 余额 < 25% 变黄、< 10% 变红；DeepSeek 余额 < 30 变黄、< 10 变红。
 
 ## 行为
 
@@ -37,12 +38,16 @@
 | `ollama` | `true` | 是否启用 Ollama Cloud 数据源 |
 | `ollamaKey` | — | 手动指定 Ollama Cloud key；不填则自动查找 |
 | `ollamaBaseURL` | `https://ollama.com` | Ollama Cloud 接口地址 |
+| `deepseek` | `true` | 是否启用 DeepSeek 数据源 |
+| `deepseekKey` | — | 手动指定 DeepSeek key；不填则自动查找 |
+| `deepseekBaseURL` | `https://api.deepseek.com` | DeepSeek 接口地址 |
 | `homeFooter` | `false` | 同时在首页底部状态行显示 |
 
 ## 数据来源
 
 - **OpenCode Go**：调用本机 OpenCode server 的 `experimental.usage.limits`，复用已登录的 Console 账号，插件不接触任何 token。
 - **Ollama Cloud**：请求 `GET https://ollama.com/api/balance`。Bearer token 依次取自插件 `ollamaKey` → `OLLAMA_API_KEY` → 集成凭据（按 provider 的 `integrationID` 匹配）→ `auth.json`；key 不会出现在日志、toast 或异常信息中。
+- **DeepSeek**：请求 `GET https://api.deepseek.com/user/balance`。key 依次取自插件 `deepseekKey` → `DEEPSEEK_API_KEY` → 集成凭据 → `auth.json`；按返回的 `balance_infos` 展示各币种余额，`/quota` 里能看到赠送与充值明细。
 
 ## 已知限制
 

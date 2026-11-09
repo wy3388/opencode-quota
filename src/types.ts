@@ -29,6 +29,16 @@ export type Snapshot =
       readonly weekly?: number
     }
   | {
+      readonly kind: "deepseek"
+      readonly available: boolean
+      readonly balances: ReadonlyArray<{
+        readonly currency: string
+        readonly total: number
+        readonly granted?: number
+        readonly toppedUp?: number
+      }>
+    }
+  | {
       readonly kind: "notice"
       readonly text: string
     }
@@ -52,6 +62,12 @@ export type Options = {
   readonly ollamaKey?: string
   /** Ollama Cloud base URL. Defaults to https://ollama.com. */
   readonly ollamaBaseURL?: string
+  /** Enable the DeepSeek adapter. Defaults to true. */
+  readonly deepseek?: boolean
+  /** DeepSeek API key. Falls back to DEEPSEEK_API_KEY, then stored credentials. */
+  readonly deepseekKey?: string
+  /** DeepSeek API base URL. Defaults to https://api.deepseek.com. */
+  readonly deepseekBaseURL?: string
   /** Also show the current provider's quota on the home footer. Defaults to false. */
   readonly homeFooter?: boolean
 }

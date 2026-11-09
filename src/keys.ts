@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { Plugin } from "@opencode/plugin/tui"
-import type { Options } from "./types"
 
 type Context = Plugin.Context
 
@@ -14,21 +13,21 @@ export function dataDirectory(): string {
 }
 
 /**
- * Ollama Cloud needs a bearer token for /api/balance. Only the server knows
- * every place a credential can live, so ask it first; env and plugin options
- * stay as explicit overrides.
+ * Balance endpoints need a bearer token. Only the server knows every place a
+ * credential can live, so ask it first; env and plugin options stay as
+ * explicit overrides.
  *
  * The value is never logged, echoed, or included in errors.
  */
-export async function resolveOllamaKey(
+export async function resolveProviderKey(
   context: Context,
   providerID: string,
-  options: Options,
+  overrides: { readonly option?: string; readonly env?: string } = {},
 ): Promise<string | undefined> {
-  const fromOptions = typeof options.ollamaKey === "string" ? options.ollamaKey.trim() : ""
+  const fromOptions = typeof overrides.option === "string" ? overrides.option.trim() : ""
   if (fromOptions) return fromOptions
 
-  const fromEnv = process.env.OLLAMA_API_KEY?.trim()
+  const fromEnv = overrides.env ? process.env[overrides.env]?.trim() : undefined
   if (fromEnv) return fromEnv
 
   const fromIntegration = await readIntegrationKey(context, providerID)

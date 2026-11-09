@@ -6,7 +6,7 @@ import { Show, createEffect, createMemo } from "solid-js"
 import type { Entry, Options, Snapshot } from "./types"
 import { createEngine, type Engine } from "./engine"
 import { adapterFor } from "./providers"
-import { age, money, percent, resetTime } from "./format"
+import { age, money, moneyIn, percent, resetTime } from "./format"
 import { debug } from "./debug"
 
 type Tone = "base" | "muted" | "warning" | "error"
@@ -62,9 +62,19 @@ function ollamaView(snapshot: Extract<Snapshot, { kind: "ollama" }>): View {
   return { label: "Ollama", text, tone }
 }
 
+function deepseekView(snapshot: Extract<Snapshot, { kind: "deepseek" }>): View {
+  const primary = snapshot.balances[0]
+  if (!primary) {
+    return { label: "DeepSeek", text: snapshot.available ? "—" : "余额不足", tone: snapshot.available ? "muted" : "error" }
+  }
+  const tone: Tone = !snapshot.available || primary.total < 10 ? "error" : primary.total < 30 ? "warning" : "muted"
+  return { label: "DeepSeek", text: moneyIn(primary.currency, primary.total), tone }
+}
+
 function viewFor(snapshot: Snapshot): View {
   if (snapshot.kind === "go") return goView(snapshot)
   if (snapshot.kind === "ollama") return ollamaView(snapshot)
+  if (snapshot.kind === "deepseek") return deepseekView(snapshot)
   return { label: "", text: snapshot.text, tone: "muted" }
 }
 
@@ -156,6 +166,14 @@ function details(context: Context, engine: Engine, options: Options, sessionID?:
     if (snapshot.weekly !== undefined) lines.push(`本周剩余: ${percent(snapshot.weekly)}`)
     const reset = resetTime(snapshot.resetAt)
     if (reset) lines.push(`周期重置: ${reset}`)
+  } else if (snapshot.kind === "deepseek") {
+    lines.push(`可用状态: ${snapshot.available ? "正常" : "余额不足"}`)
+    for (const balance of snapshot.balances) {
+      const parts = [`总额 ${moneyIn(balance.currency, balance.total)}`]
+      if (balance.granted !== undefined) parts.push(`赠送 ${moneyIn(balance.currency, balance.granted)}`)
+      if (balance.toppedUp !== undefined) parts.push(`充值 ${moneyIn(balance.currency, balance.toppedUp)}`)
+      lines.push(`${balance.currency}: ${parts.join(" · ")}`)
+    }
   } else {
     lines.push(snapshot.text)
   }

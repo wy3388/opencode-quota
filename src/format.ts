@@ -14,6 +14,20 @@ export function money(value: number): string {
   }).format(value)
 }
 
+/** Currency-aware amount, e.g. ¥110.00 or $72.50. */
+export function moneyIn(currency: string, value: number): string {
+  try {
+    return new Intl.NumberFormat(currency === "CNY" ? "zh-CN" : "en-US", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  } catch {
+    return `${value.toFixed(2)} ${currency}`
+  }
+}
+
 /** Local reset time, short form. */
 export function resetTime(value: number | undefined): string | undefined {
   if (!value || !Number.isFinite(value)) return undefined
