@@ -1,6 +1,6 @@
 {
   "name": "@wy3366/opencode-quota",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenCode TUI plugin that shows the active model provider's remaining quota in the sidebar",
   "type": "module",
   "exports": {
