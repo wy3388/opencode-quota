@@ -56,6 +56,12 @@ export type Options = {
   readonly pollSeconds?: number
   /** Enable the OpenCode Go adapter. Defaults to true. */
   readonly go?: boolean
+  /** OpenCode Go API key. Falls back to OPENCODE_API_KEY, then stored credentials. */
+  readonly goKey?: string
+  /** OpenCode Go inference base URL. Defaults to the provider's configured URL, then https://opencode.ai/zen/go/v1. */
+  readonly goBaseURL?: string
+  /** Console URL opened from /quota when only an API key is configured. */
+  readonly goUsageURL?: string
   /** Enable the Ollama Cloud adapter. Defaults to true. */
   readonly ollama?: boolean
   /** Ollama Cloud API key. Falls back to OLLAMA_API_KEY, then auth.json. */

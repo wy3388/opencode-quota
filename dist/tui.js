@@ -98,23 +98,82 @@ var retryAfter = (response) => {
   const seconds = Number.isFinite(header) && header > 0 ? header : 60;
   throw new QuotaError("\u9650\u6D41", seconds * 1e3);
 };
+var isoTime = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return void 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : void 0;
+};
+var goMeter = (value) => {
+  const percent2 = number(value?.percent);
+  const resetsAt = isoTime(value?.resetsAt);
+  if (percent2 === void 0 || resetsAt === void 0) return void 0;
+  const limited = typeof value?.status === "string" ? value.status !== "ok" : percent2 >= 100;
+  return { percent: percent2, limited, resetsAt };
+};
+var GO_USAGE_FALLBACK = "https://opencode.ai/zen/go/v1";
+var GO_CONSOLE_URL = "https://opencode.ai/console/go";
+function goUsageEndpoint(base) {
+  const trimmed = base.trim().replace(/\/+$/, "").replace(/\/openai\/v1$/, "/v1").replace(/\/openai$/, "");
+  return `${trimmed}/usage`;
+}
+function providerBaseURL(ctx, providerID) {
+  try {
+    const providers = ctx.data.location.provider.list(ctx.location) ?? [];
+    const base = providers.find((entry) => entry.id === providerID)?.settings?.baseURL;
+    return typeof base === "string" && base.trim() ? base.trim() : void 0;
+  } catch {
+    return void 0;
+  }
+}
+async function goUsageFromKey(ctx, signal, options, providerID) {
+  const key = await resolveProviderKey(ctx, providerID, { option: options.goKey, env: "OPENCODE_API_KEY" });
+  if (!key) return void 0;
+  const base = options.goBaseURL ?? providerBaseURL(ctx, providerID) ?? GO_USAGE_FALLBACK;
+  const response = await fetch(goUsageEndpoint(base), {
+    headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
+    signal
+  });
+  if (response.status === 401 || response.status === 403) return { kind: "notice", text: "key \u65E0\u6548" };
+  if (response.status === 429) retryAfter(response);
+  if (!response.ok) throw new QuotaError(String(response.status));
+  const body = await response.json();
+  const usage = body?.usage ?? body;
+  const rolling = goMeter(usage?.rolling);
+  const weekly = goMeter(usage?.weekly);
+  const monthly = goMeter(usage?.monthly);
+  if (!rolling || !weekly || !monthly) return { kind: "notice", text: "\u65E0\u7528\u91CF\u6570\u636E" };
+  return { kind: "go", rolling, weekly, monthly, usageURL: options.goUsageURL ?? GO_CONSOLE_URL };
+}
 var goAdapter = {
   id: "opencode-go",
   label: "Go",
-  async fetch(ctx, signal) {
-    const location = ctx.location ?? ctx.data.location.default();
-    const response = await ctx.client.experimental.usage.limits({ location });
-    if (signal.aborted) throw new QuotaError("aborted");
-    const info = response.data;
-    if (!info) return { kind: "notice", text: "\u672A\u767B\u5F55 Console" };
-    if (!info.go) return { kind: "notice", text: "\u5DE5\u4F5C\u533A\u672A\u5F00\u901A Go" };
-    return {
-      kind: "go",
-      rolling: info.go.rolling,
-      weekly: info.go.weekly,
-      monthly: info.go.monthly,
-      usageURL: info.workspace.usageURL
-    };
+  async fetch(ctx, signal, options, providerID) {
+    let notice = { kind: "notice", text: "\u672A\u767B\u5F55 Console" };
+    let failure;
+    try {
+      const location = ctx.location ?? ctx.data.location.default();
+      const response = await ctx.client.experimental.usage.limits({ location });
+      if (signal.aborted) throw new QuotaError("aborted");
+      const info = response.data;
+      if (info?.go) {
+        return {
+          kind: "go",
+          rolling: info.go.rolling,
+          weekly: info.go.weekly,
+          monthly: info.go.monthly,
+          usageURL: info.workspace.usageURL
+        };
+      }
+      if (info) notice = { kind: "notice", text: "\u5DE5\u4F5C\u533A\u672A\u5F00\u901A Go" };
+    } catch (error) {
+      if (signal.aborted) throw new QuotaError("aborted");
+      failure = error;
+    }
+    const fromKey = await goUsageFromKey(ctx, signal, options, providerID);
+    if (fromKey) return fromKey;
+    if (failure) throw failure;
+    return notice;
   }
 };
 var ollamaAdapter = {
